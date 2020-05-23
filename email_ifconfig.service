@@ -1,0 +1,12 @@
+[Unit]
+Description=e-mail ifconfig Service
+After=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bin/email_ifconfig/default
+ExecStart=/home/pi/bin/email_ifconfig/default/email_ifconfig
+
+[Install]
+WantedBy=multi-user.target
