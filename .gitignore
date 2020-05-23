@@ -109,6 +109,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+_venv_
+__venv__
 
 # Spyder project settings
 .spyderproject
@@ -127,3 +129,18 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Custom config files
+*cfg*
+!*cfg_example*
+config.py
+!*config_example*
+
+# Backup files
+*.save
+*_backup.*
+*.bak
+~*
+
+# Vim swap files
+*.swp
