@@ -135,12 +135,15 @@ dmypy.json
 !*cfg_example*
 config.py
 !*config_example*
+*.ini
+!*_example.ini
 
 # Backup files
 *.save
 *_backup.*
 *.bak
 ~*
+*.backup
 
 # Vim swap files
 *.swp
