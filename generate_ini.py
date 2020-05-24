@@ -5,12 +5,12 @@ import os
 import configparser
 import argparse
 from Cryptodome.PublicKey import RSA
-from Cryptodome.Cipher import PKCS1_OAEP
+from Cryptodome.Random import get_random_bytes
+from Cryptodome.Cipher import AES, PKCS1_OAEP
 from subprocess import Popen, PIPE
 
 
 # global variables ---------------------------------------------- {{{1
-# RSA = None
 CONFIG = 'mail.ini'
 
 
@@ -71,15 +71,39 @@ def generate_rsa_key_pair(password=None):
 
 
 def encrypt(string_to_encrypt, public_key):
-    key = RSA.importKey(open(public_key, 'r').read())
-    cipher = PKCS1_OAEP.new(key)
-    return cipher.encrypt(string_to_encrypt.encode('utf-8'))
+    recipient_key = RSA.importKey(open(public_key, 'r').read())
+    session_key = get_random_bytes(16)
+
+    # Encrypt the session key with the public RSA key
+    cipher_rsa = PKCS1_OAEP.new(recipient_key)
+    enc_session_key = cipher_rsa.encrypt(session_key)
+
+    # Encrypt the data with the AES session key
+    # EAX mode is used to allow detection of unauthoriyed modifications
+    cipher_aes = AES.new(session_key, AES.MODE_EAX)
+    ciphertext, tag = cipher_aes.encrypt_and_digest(string_to_encrypt.encode('utf-8'))
+
+    pass_file = 'password.bin'
+    with open(pass_file, 'wb') as file_out:
+        [file_out.write(x) for x in (enc_session_key, cipher_aes.nonce, tag, ciphertext)]
+    return pass_file
 
 
 def decrypt(string_to_decrypt, private_key):
     key = RSA.importKey(open(private_key, 'r').read())
-    cipher = PKCS1_OAEP.new(key)
-    return cipher.decrypt(string_to_decrypt).decode('utf-8')
+
+    with open(string_to_decrypt, 'rb') as file_in:
+        enc_session_key, nonce, tag, ciphertext = [file_in.read(x) for x in (key.size_in_bytes(), 16, 16, -1)]
+
+    # Decrypt the session key with the private RSA key
+    cipher_rsa = PKCS1_OAEP.new(key)
+    session_key = cipher_rsa.decrypt(enc_session_key)
+
+    # Decrypt the data with the AES session key
+    cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+    decrypted_string = cipher_aes.decrypt_and_verify(ciphertext, tag)
+
+    return decrypted_string.decode('utf-8')
 
 
 def test_encryption(private_key=None, public_key=None):
@@ -89,26 +113,26 @@ def test_encryption(private_key=None, public_key=None):
     test_string = 'this is a test string'
     print('test string: {0}'.format(test_string))
     encrypted = encrypt(test_string, public_key)
-    print('encrypted string: {0}'.format(encrypted))
+#     print('encrypted string: {0}'.format(encrypted))
     decrypted = decrypt(encrypted, private_key)
     print('decrypted string: {0}'.format(decrypted))
 
 
 def input_default(prompt, default, to_type=str):
-    val = input('{0} (default: {1}): '.format(prompt, default))
+    val = input('    {0} (default: {1}): '.format(prompt, default))
     if val is '':
         val = default
     return to_type(val)
 
 
 def input_list(prompt, default):
-    print('{0} (default: {1}):'.format(prompt, str(default)))
+    print('    {0} (default: {1}):'.format(prompt, str(default)))
     vals = []
     val = None
     i = 0
     while True:
         i += 1
-        val = input('Command {0}: '.format(i))
+        val = input('        Command {0}: '.format(i))
         if len(vals) == 0 and val == '':
             vals = default
             break
@@ -127,13 +151,16 @@ def edit_ini(private_key=None, public_key=None):
     ini = configparser.ConfigParser()
     ini.read(CONFIG)
 
-    default = ini['DEFAULT']
-    sender = ini['DEFAULT']['sender']
-    for key in ini[sender].keys():
-        if key == 'password':
-            ini[sender][key] = encrypt(input_default(key, decrypt(ini[sender][key].strip(), private_key), str), public_key)
-        else:
-            ini[sender][key] = input_default(key, ini[sender][key], str)
+    for section in ini.sections():
+        print(f'[{section}]')
+        for key in ini[section].keys():
+            if key == 'password':
+                # TODO: implement from getpass import getpass method to not show the password
+                ini[section][key] = encrypt(input_default(key, decrypt(ini[section][key], private_key), str), public_key)
+            elif key == 'commands':
+                ini[section][key] = '\n'.join(input_list(key, ini[section][key].split('\n')))
+            else:
+                ini[section][key] = input_default(key, ini[section][key], str)
 
 def generate_ini(private_key=None, public_key=None):
     print('[+] Private key: {0}'.format(private_key))
@@ -144,6 +171,7 @@ def generate_ini(private_key=None, public_key=None):
     sender = 'SENDER'
     sender_name = input_default('Name', 'My Raspberry Pi4', str)
     sender_email = input_default('E-mail', 'senderemail@gmail.com', str)
+    # TODO: implement from getpass import getpass method to not show the password
     sender_pass = encrypt(input_default('Password', 'mysupersecretpassword', str), public_key)
     sender_port = input_default('Port', '465', str)
     sender_server = input_default('Server', 'smtp.gmail.com', str)
@@ -159,10 +187,12 @@ def generate_ini(private_key=None, public_key=None):
     commands = ['ifconfig', 'iwconfig', 'curl https://ipecho.net/plain', 'netstat -r', 'traceroute 8.8.8.8']
     commands = input_list('Commands to Execute', commands)
 
-    ini['DEFAULT'] = {'sender': sender,
-                      'receiver': receiver,
-                      'subject': subject,
-                      'commands': '\n'.join(commands)}
+    ini['GLOBAL'] = {'sender': sender,
+                     'receiver': receiver,
+                     'subject': subject,
+                     'rsa_private': private_key,
+                     'rsa_public': public_key,
+                     'commands': '\n'.join(commands)}
     ini[sender] = {'name': f'{sender_name} <{sender_email}>',
                    'username': sender_email,
                    'password': sender_pass,

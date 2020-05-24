@@ -12,6 +12,8 @@ import socket
 from time import sleep
 from email.message import EmailMessage
 
+from generate_ini import decrypt
+
 # Global variables --------------------------------------------------------------->
 CONFIG = './mail.ini'
 MAX_TIMEOUT = 32
@@ -74,7 +76,7 @@ class config():
         self.__ini = configparser.ConfigParser()
         self.__ini.read(ini)
 
-    def get_section(self, section='DEFAULT'):
+    def get_section(self, section='GLOBAL'):
         '''
         Function to read whole section from *.ini file and return it as a dicitionary.
         If the section is not present, return None.
@@ -86,7 +88,7 @@ class config():
             data = None
         return data
 
-    def get_config(self, section='DEFAULT', key='email_to'):
+    def get_config(self, section='GLOBAL', key='email_to'):
         '''
         Function to get a specific key from a specific section of *.ini file.
         '''
@@ -114,19 +116,19 @@ def main():
     print('[+] Composing message.')
     ini = config(CONFIG)
 
-    sender = ini.get_section(ini.get_config('DEFAULT', 'sender'))
-    receiver = ini.get_section(ini.get_config('DEFAULT', 'receiver'))
+    sender = ini.get_section(ini.get_config('GLOBAL', 'sender'))
+    receiver = ini.get_section(ini.get_config('GLOBAL', 'receiver'))
 
     msg = EmailMessage()
-    msg.set_content(compose_message(ini.get_config('DEFAULT', 'commands').split('\n')))
-    msg['Subject'] = ini.get_config('DEFAULT', 'subject')
+    msg.set_content(compose_message(ini.get_config('GLOBAL', 'commands').split('\n')))
+    msg['Subject'] = ini.get_config('GLOBAL', 'subject')
     msg['From'] = sender['name']
     msg['To'] = receiver['name']
 
     # Send the message via our own SMTP server.
     print('[+] Sending e-mail...')
     with smtplib.SMTP_SSL(sender['server'], int(sender['port'])) as s:
-        s.login(sender['username'], sender['password'])
+        s.login(sender['username'], decrypt(sender['password'], ini.get_config('GLOBAL', 'rsa_private')))
         s.send_message(msg)
         print('[+] E-mail sent to {0}.'.format(receiver['username']))
 
