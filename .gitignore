@@ -147,3 +147,7 @@ config.py
 
 # Vim swap files
 *.swp
+
+# keys
+*rsa*
+*.bin
