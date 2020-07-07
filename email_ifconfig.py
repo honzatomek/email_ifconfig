@@ -130,7 +130,7 @@ def main():
     with smtplib.SMTP_SSL(sender['server'], int(sender['port'])) as s:
         s.login(sender['username'], decrypt(sender['password'], ini.get_config('GLOBAL', 'rsa_private')))
         s.send_message(msg)
-        print('[+] E-mail sent to {0}.'.format(receiver['username']))
+        print('[+] E-mail sent to {0}.'.format(receiver['name']))
 
 
 if __name__ == '__main__':
