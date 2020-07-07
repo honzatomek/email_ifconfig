@@ -156,11 +156,29 @@ def edit_ini(private_key=None, public_key=None):
         for key in ini[section].keys():
             if key == 'password':
                 # TODO: implement from getpass import getpass method to not show the password
-                ini[section][key] = encrypt(input_default(key, decrypt(ini[section][key], private_key), str), public_key)
+                if os.path.isfile(ini[section][key]):
+                    ini[section][key] = encrypt(input_default(key, decrypt(ini[section][key], private_key), str), public_key)
+                else:
+                    ini[section][key] = encrypt(input_default(key, 'mysupersecretpaswword', str), public_key)
+            elif key == 'rsa_private':
+                if private_key != ini[section][key]:
+                    ini[section][key] = input_default(key, private_key, str)
+                else:
+                    ini[section][key] = input_default(key, ini[section][key], str)
+            elif key == 'rsa_public':
+                if public_key != ini[section][key]:
+                    ini[section][key] = input_default(key, public_key, str)
+                else:
+                    ini[section][key] = input_default(key, ini[section][key], str)
             elif key == 'commands':
                 ini[section][key] = '\n'.join(input_list(key, ini[section][key].split('\n')))
             else:
                 ini[section][key] = input_default(key, ini[section][key], str)
+
+    with open(CONFIG, 'w', encoding='utf-8') as config:
+        ini.write(config)
+
+    print('[+] {0} file written.'.format(CONFIG))
 
 def generate_ini(private_key=None, public_key=None):
     print('[+] Private key: {0}'.format(private_key))
