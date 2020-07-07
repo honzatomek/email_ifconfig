@@ -4,14 +4,12 @@
 import os
 import configparser
 import argparse
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Random import get_random_bytes
-from Cryptodome.Cipher import AES, PKCS1_OAEP
-from subprocess import Popen, PIPE
+from mycrypto import encrypt, decrypt, generate_rsa_key_pair
 
 
 # global variables ---------------------------------------------- {{{1
 CONFIG = 'mail.ini'
+PASSWORD_FILENAME = 'password.bin'
 
 
 # classes ------------------------------------------------------- {{{1
@@ -36,88 +34,6 @@ class CheckPath(argparse.Action):
 
 
 # functions ----------------------------------------------------- {{{1
-def generate_rsa_key_pair(password=None):
-    '''
-    idea from: https://stackoverflow.com/questions/2466401/how-to-generate-ssh-key-pairs-with-python
-    '''
-    print('[+] generating RSA key pair.')
-    path = os.path.join(os.getcwd(), 'email_ifconfig_rsa')
-
-    if os.path.isfile(path):
-        print('[+] removing existing file: {0}'.format(path))
-        os.remove(path)
-
-    if os.path.isfile(path + '.pub'):
-        print('[+] removing existing file: {0}'.format(path + '.pub'))
-        os.remove(path + '.pub')
-
-    cmd = ['ssh-keygen', '-m', 'PEM', '-t', 'rsa', '-f', path]
-    if password:
-        cmd.append('-P')
-        cmd.append(password)
-
-    p = Popen(cmd, stdout=PIPE)
-    p.wait()
-    res, err = p.communicate()
-
-    if err:
-        raise Exception(err)
-
-    if res:
-        cert_content = res.decode('utf-8')
-        print('[+] Certificate: {0}'.format(cert_content))
-
-    return path, path + '.pub'
-
-
-def encrypt(string_to_encrypt, public_key):
-    recipient_key = RSA.importKey(open(public_key, 'r').read())
-    session_key = get_random_bytes(16)
-
-    # Encrypt the session key with the public RSA key
-    cipher_rsa = PKCS1_OAEP.new(recipient_key)
-    enc_session_key = cipher_rsa.encrypt(session_key)
-
-    # Encrypt the data with the AES session key
-    # EAX mode is used to allow detection of unauthoriyed modifications
-    cipher_aes = AES.new(session_key, AES.MODE_EAX)
-    ciphertext, tag = cipher_aes.encrypt_and_digest(string_to_encrypt.encode('utf-8'))
-
-    pass_file = 'password.bin'
-    with open(pass_file, 'wb') as file_out:
-        [file_out.write(x) for x in (enc_session_key, cipher_aes.nonce, tag, ciphertext)]
-    return pass_file
-
-
-def decrypt(string_to_decrypt, private_key):
-    key = RSA.importKey(open(private_key, 'r').read())
-
-    with open(string_to_decrypt, 'rb') as file_in:
-        enc_session_key, nonce, tag, ciphertext = [file_in.read(x) for x in (key.size_in_bytes(), 16, 16, -1)]
-
-    # Decrypt the session key with the private RSA key
-    cipher_rsa = PKCS1_OAEP.new(key)
-    session_key = cipher_rsa.decrypt(enc_session_key)
-
-    # Decrypt the data with the AES session key
-    cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
-    decrypted_string = cipher_aes.decrypt_and_verify(ciphertext, tag)
-
-    return decrypted_string.decode('utf-8')
-
-
-def test_encryption(private_key=None, public_key=None):
-    print('[+] Private key: {0}'.format(private_key))
-    print('[+] Public key: {0}'.format(public_key))
-
-    test_string = 'this is a test string'
-    print('test string: {0}'.format(test_string))
-    encrypted = encrypt(test_string, public_key)
-#     print('encrypted string: {0}'.format(encrypted))
-    decrypted = decrypt(encrypted, private_key)
-    print('decrypted string: {0}'.format(decrypted))
-
-
 def input_default(prompt, default, to_type=str):
     val = input('    {0} (default: {1}): '.format(prompt, default))
     if val is '':
@@ -157,19 +73,21 @@ def edit_ini(private_key=None, public_key=None):
             if key == 'password':
                 # TODO: implement from getpass import getpass method to not show the password
                 if os.path.isfile(ini[section][key]):
-                    ini[section][key] = encrypt(input_default(key, decrypt(ini[section][key], private_key), str), public_key)
+                    ini[section][key] = encrypt(input_default(key, decrypt(ini[section][key], private_key), str), public_key, PASSWORD_FILENAME)
                 else:
-                    ini[section][key] = encrypt(input_default(key, 'mysupersecretpaswword', str), public_key)
+                    ini[section][key] = encrypt(input_default(key, 'mysupersecretpaswword', str), public_key, PASSWORD_FILENAME)
             elif key == 'rsa_private':
-                if private_key != ini[section][key]:
+                if private_key != ini[section][key] and private_key is not None:
                     ini[section][key] = input_default(key, private_key, str)
                 else:
                     ini[section][key] = input_default(key, ini[section][key], str)
+                private_key = ini[section][key]
             elif key == 'rsa_public':
-                if public_key != ini[section][key]:
+                if public_key != ini[section][key] and public_key is not None:
                     ini[section][key] = input_default(key, public_key, str)
                 else:
                     ini[section][key] = input_default(key, ini[section][key], str)
+                public_key = ini[section][key]
             elif key == 'commands':
                 ini[section][key] = '\n'.join(input_list(key, ini[section][key].split('\n')))
             else:
@@ -190,7 +108,7 @@ def generate_ini(private_key=None, public_key=None):
     sender_name = input_default('Name', 'My Raspberry Pi4', str)
     sender_email = input_default('E-mail', 'senderemail@gmail.com', str)
     # TODO: implement from getpass import getpass method to not show the password
-    sender_pass = encrypt(input_default('Password', 'mysupersecretpassword', str), public_key)
+    sender_pass = encrypt(input_default('Password', 'mysupersecretpassword', str), public_key, PASSWORD_FILENAME)
     sender_port = input_default('Port', '465', str)
     sender_server = input_default('Server', 'smtp.gmail.com', str)
     sender_protocol = input_default('Protocol', 'SSL', str)
@@ -244,12 +162,12 @@ if __name__ == '__main__':
                     help='edit existing *.ini file')
 
     args = ap.parse_args()
-    if args.rsa_public is None or args.rsa_private is None:
-        prikey, pubkey = generate_rsa_key_pair()
-    else:
-        prikey = os.path.join(os.getcwd(), args.rsa_private)
-        pubkey = os.path.join(os.getcwd(), args.rsa_public)
     if args.edit:
-        edit_ini(private_key=prikey, public_key=pubkey)
+        edit_ini()
     else:
+        if args.rsa_public is None or args.rsa_private is None:
+            prikey, pubkey = generate_rsa_key_pair()
+        else:
+            prikey = os.path.join(os.getcwd(), args.rsa_private)
+            pubkey = os.path.join(os.getcwd(), args.rsa_public)
         generate_ini(private_key=prikey, public_key=pubkey)

@@ -12,7 +12,7 @@ import socket
 from time import sleep
 from email.message import EmailMessage
 
-from generate_ini import decrypt
+from mycrypto import decrypt
 
 # Global variables --------------------------------------------------------------->
 CONFIG = './mail.ini'
