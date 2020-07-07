@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-# general imports ----------------------------------------------- {{{1
+# general imports --------------------------------------------------------- {{{1
 import os
-import configparser
 import argparse
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Random import get_random_bytes
@@ -10,11 +9,7 @@ from Cryptodome.Cipher import AES, PKCS1_OAEP
 from subprocess import Popen, PIPE
 
 
-# global variables ---------------------------------------------- {{{1
-CONFIG = 'mail.ini'
-
-
-# classes ------------------------------------------------------- {{{1
+# classes ----------------------------------------------------------------- {{{1
 class InvalidPath(Exception):
     pass
 
@@ -35,7 +30,7 @@ class CheckPath(argparse.Action):
         setattr(namespace, self.dest, values)
 
 
-# functions ----------------------------------------------------- {{{1
+# functions --------------------------------------------------------------- {{{1
 def generate_rsa_key_pair(keyname='generated_rsa', password=None):
     '''
     Generates RSA public/private key pair.
@@ -82,11 +77,12 @@ def generate_rsa_key_pair(keyname='generated_rsa', password=None):
 
 def encrypt(string_to_encrypt, public_key, encrypted_file='password.bin'):
     '''
-    ENCRYPTS a string using RSA - AES key combination. First an AES session key is generated,
-    then it is used to encrypt the string_to_encrypt. Aftwerwards the AES session key is encrypted
-    using the RSA public key and the encrypted AES key is stored together with the encrypted
-    string_to_encrypt in a file.
-    This has the advantage of encrypting strings too short for a RSA encryption (e.g. passwords).
+    ENCRYPTS a string using RSA - AES key combination. First an AES session key
+    is generated, then it is used to encrypt the string_to_encrypt. Aftwerwards
+    the AES session key is encrypted using the RSA public key and the encrypted
+    AES key is stored together with the encrypted string_to_encrypt in a file.
+    This has the advantage of encrypting strings too short for a RSA encryption
+    (e.g. passwords).
 
     WARNING: Does not work if RSA key has password.
 
@@ -94,7 +90,8 @@ def encrypt(string_to_encrypt, public_key, encrypted_file='password.bin'):
         string_to_encrypt: string to be encrypted
         public_key:        file with RSA public key
     Optional:
-        encrypted_file:    filename where to store the ecrypted string (DEFAULT = password.bin)'
+        encrypted_file:    filename where to store the ecrypted string
+                           (DEFAULT = password.bin)'
     Out:
         file with the encrypted string
     '''
@@ -116,21 +113,26 @@ def encrypt(string_to_encrypt, public_key, encrypted_file='password.bin'):
     ciphertext, tag = cipher_aes.encrypt_and_digest(string_to_encrypt.encode('utf-8'))
 
     with open(encrypted_file, 'wb') as file_out:
-        [file_out.write(x) for x in (enc_session_key, cipher_aes.nonce, tag, ciphertext)]
+        [file_out.write(x) for x in (enc_session_key,
+                                     cipher_aes.nonce,
+                                     tag,
+                                     ciphertext)]
 
     return encrypted_file
 
 
 def decrypt(string_to_decrypt, private_key):
     '''
-    DECRYPTS a string ENCRYPTED using RSA - AES key combination. RSA encrypted key is extracted from
-    the string_to_decrypt, decrypted using RSA private key and the ewsulting AES session key is used
-    to decrypt the encrypted string stored at the end of the string_to_decrypt file.
+    DECRYPTS a string ENCRYPTED using RSA - AES key combination. RSA encrypted
+    key is extracted from the string_to_decrypt, decrypted using RSA private
+    key and the ewsulting AES session key is used to decrypt the encrypted
+    string stored at the end of the string_to_decrypt file.
 
     WARNING: Does not work if RSA key has password.
 
     In:
-        string_to_decrypt: file with (RSA encrypted AES session key, AES session key NONCE, TAG, encrypted text)
+        string_to_decrypt: file with (RSA encrypted AES session key, AES
+                           session key NONCE, TAG, encrypted text)
         private_key:       RSA private key filename
     Out:
         decrypted string if everything works, AssertionError if not
@@ -157,13 +159,15 @@ def decrypt(string_to_decrypt, private_key):
 
 def test_encryption(private_key=None, public_key=None, test_string='This is a test string'):
     '''
-    Tests if encrypt() and decrypt() functions work both ways. First the test_string is ENCRYPTED,
-    then the encrypted string is DECRYPTED and the result is checked.
+    Tests if encrypt() and decrypt() functions work both ways. First the
+    test_string is ENCRYPTED, then the encrypted string is DECRYPTED and the
+    result is checked.
 
     In:
         private_key: RSA private key file
         public_key:  RSA public key file
-        test_string: String to test the ecryption on (DEFAULT = 'This is a test string')
+        test_string: String to test the ecryption on
+                     (DEFAULT = 'This is a test string')
     Out:
         True if the ENCRYPTION - DECRYPTION works, AssertionError if not.
     '''
@@ -198,14 +202,19 @@ if __name__ == '__main__':
         prikey = None
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-u", "--rsa-public", type=str, action=CheckPath, default=pubkey, help="supply path for rsa public key to decrypt passwords")
-    parser.add_argument("-r", "--rsa-private", type=str, action=CheckPath, default=prikey, help="supply path for rsa private key to encrypt passwords")
+    parser.add_argument("-u", "--rsa-public", type=str, action=CheckPath, default=pubkey,
+                        help="supply path for rsa public key to decrypt passwords")
+    parser.add_argument("-r", "--rsa-private", type=str, action=CheckPath, default=prikey,
+                        help="supply path for rsa private key to encrypt passwords")
 
     parser_group = parser.add_mutually_exclusive_group()
-    parser_group.add_argument('-e', '--encrypt', default=False, action='store_true', help='ENCRYPT supplied password')
-    parser_group.add_argument('-d', '--decrypt', default=False, action='store_true', help='DECRYPT supplied password *.bin file')
+    parser_group.add_argument('-e', '--encrypt', default=False, action='store_true',
+                              help='ENCRYPT supplied password')
+    parser_group.add_argument('-d', '--decrypt', default=False, action='store_true',
+                              help='DECRYPT supplied password *.bin file')
 
-    parser.add_argument('password', type=str, nargs=1, help='password to ENCRYPT or *.bin file to DECRYPT')
+    parser.add_argument('password', type=str, nargs=1,
+                        help='password to ENCRYPT or *.bin file to DECRYPT')
 
     args = parser.parse_args()
 
