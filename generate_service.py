@@ -8,7 +8,7 @@ After=network-online.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory={{cwd}}
+WorkingDirectory={{cwd}}/
 ExecStart={{script}}
 
 [Install]

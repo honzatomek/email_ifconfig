@@ -5,8 +5,8 @@ After=network-online.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/Programming/PYTHON3/bin/email_ifconfig
-ExecStart=/home/pi/Programming/PYTHON3/bin/email_ifconfig/email_ifconfig.py
+WorkingDirectory=/home/pi/bin/email_ifconfig/
+ExecStart=/home/pi/bin/email_ifconfig/email_ifconfig.py
 
 [Install]
 WantedBy=multi-user.target
